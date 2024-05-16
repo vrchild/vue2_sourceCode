@@ -33,10 +33,15 @@ function matches(
 }
 
 function pruneCache(
-  keepAliveInstance: { cache: CacheEntryMap; keys: string[]; _vnode: VNode },
+  keepAliveInstance: {
+    cache: CacheEntryMap
+    keys: string[]
+    _vnode: VNode
+    $vnode: VNode
+  },
   filter: Function
 ) {
-  const { cache, keys, _vnode } = keepAliveInstance
+  const { cache, keys, _vnode, $vnode } = keepAliveInstance
   for (const key in cache) {
     const entry = cache[key]
     if (entry) {
@@ -46,6 +51,7 @@ function pruneCache(
       }
     }
   }
+  $vnode.componentOptions!.children = undefined
 }
 
 function pruneCacheEntry(
@@ -54,7 +60,7 @@ function pruneCacheEntry(
   keys: Array<string>,
   current?: VNode
 ) {
-  const entry = cache[key]
+  const entry = cache[key] // 缓存list中的第一个组件
   if (entry && (!current || entry.tag !== current.tag)) {
     // @ts-expect-error can be undefined
     entry.componentInstance.$destroy()
@@ -68,57 +74,12 @@ const patternTypes: Array<Function> = [String, RegExp, Array]
 // TODO defineComponent
 export default {
   name: 'keep-alive',
-  abstract: true,
+  abstract: true, // 抽象组件
 
   props: {
     include: patternTypes,
     exclude: patternTypes,
     max: [String, Number]
-  },
-
-  methods: {
-    cacheVNode() {
-      const { cache, keys, vnodeToCache, keyToCache } = this
-      if (vnodeToCache) {
-        const { tag, componentInstance, componentOptions } = vnodeToCache
-        cache[keyToCache] = {
-          name: _getComponentName(componentOptions),
-          tag,
-          componentInstance
-        }
-        keys.push(keyToCache)
-        // prune oldest entry
-        if (this.max && keys.length > parseInt(this.max)) {
-          pruneCacheEntry(cache, keys[0], keys, this._vnode)
-        }
-        this.vnodeToCache = null
-      }
-    }
-  },
-
-  created() {
-    this.cache = Object.create(null)
-    this.keys = []
-  },
-
-  destroyed() {
-    for (const key in this.cache) {
-      pruneCacheEntry(this.cache, key, this.keys)
-    }
-  },
-
-  mounted() {
-    this.cacheVNode()
-    this.$watch('include', val => {
-      pruneCache(this, name => matches(val, name))
-    })
-    this.$watch('exclude', val => {
-      pruneCache(this, name => !matches(val, name))
-    })
-  },
-
-  updated() {
-    this.cacheVNode()
   },
 
   render() {
@@ -143,8 +104,8 @@ export default {
         vnode.key == null
           ? // same constructor may get registered as different local components
             // so cid alone is not enough (#3269)
-            componentOptions.Ctor.cid +
-            (componentOptions.tag ? `::${componentOptions.tag}` : '')
+          componentOptions.Ctor.cid +
+          (componentOptions.tag ? `::${componentOptions.tag}` : '')
           : vnode.key
       if (cache[key]) {
         vnode.componentInstance = cache[key].componentInstance
@@ -161,5 +122,58 @@ export default {
       vnode.data.keepAlive = true
     }
     return vnode || (slot && slot[0])
+  },
+
+  created() {
+    this.cache = Object.create(null)
+    this.keys = []
+  },
+
+  mounted() {
+    this.cacheVNode()
+    this.$watch('include', val => {
+      pruneCache(this, name => matches(val, name))
+    })
+    this.$watch('exclude', val => {
+      pruneCache(this, name => !matches(val, name))
+    })
+  },
+
+  updated() {
+    this.cacheVNode()
+  },
+
+  methods: {
+    cacheVNode() {
+      /*
+      * cache vue实例中keep-alive 缓存组件list
+      * keys 缓存组件名称list
+      * vnodeToCache
+      * keyToCache
+      * */
+      const { cache, keys, vnodeToCache, keyToCache } = this
+      if (vnodeToCache) {
+        console.log('keep-alive', vnodeToCache, this)
+        const { tag, componentInstance, componentOptions } = vnodeToCache
+        cache[keyToCache] = {
+          name: _getComponentName(componentOptions),
+          tag,
+          componentInstance
+        }
+        keys.push(keyToCache)
+        // prune oldest entry
+        // 如果超出最大缓存数
+        if (this.max && keys.length > parseInt(this.max)) {
+          pruneCacheEntry(cache, keys[0], keys, this._vnode)
+        }
+        this.vnodeToCache = null
+      }
+    }
+  },
+
+  destroyed() {
+    for (const key in this.cache) {
+      pruneCacheEntry(this.cache, key, this.keys)
+    }
   }
 }

@@ -1,6 +1,6 @@
 /*!
- * Vue.js v2.7.13
- * (c) 2014-2022 Evan You
+ * Vue.js v2.7.16
+ * (c) 2014-2024 Evan You
  * Released under the MIT License.
  */
 (function (global, factory) {
@@ -82,8 +82,15 @@
       return val == null
           ? ''
           : Array.isArray(val) || (isPlainObject(val) && val.toString === _toString)
-              ? JSON.stringify(val, null, 2)
+              ? JSON.stringify(val, replacer, 2)
               : String(val);
+  }
+  function replacer(_key, val) {
+      // avoid circular deps from v3
+      if (val && val.__v_isRef) {
+          return val.value;
+      }
+      return val;
   }
   /**
    * Convert an input value to a number for persistence.
@@ -246,9 +253,7 @@
    */
   function genStaticKeys$1(modules) {
       return modules
-          .reduce(function (keys, m) {
-          return keys.concat(m.staticKeys || []);
-      }, [])
+          .reduce(function (keys, m) { return keys.concat(m.staticKeys || []); }, [])
           .join(',');
   }
   /**
@@ -751,6 +756,11 @@
       return __assign.apply(this, arguments);
   };
 
+  typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+      var e = new Error(message);
+      return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+  };
+
   var uid$2 = 0;
   var pendingCleanupDeps = [];
   var cleanupDeps = function () {
@@ -881,79 +891,8 @@
       });
   });
 
-  var rawMap = new WeakMap();
-  function reactive(target) {
-      makeReactive(target, false);
-      return target;
-  }
-  /**
-   * Return a shallowly-reactive copy of the original object, where only the root
-   * level properties are reactive. It also does not auto-unwrap refs (even at the
-   * root level).
-   */
-  function shallowReactive(target) {
-      makeReactive(target, true);
-      def(target, "__v_isShallow" /* ReactiveFlags.IS_SHALLOW */, true);
-      return target;
-  }
-  function makeReactive(target, shallow) {
-      // if trying to observe a readonly proxy, return the readonly version.
-      if (!isReadonly(target)) {
-          {
-              if (isArray(target)) {
-                  warn$2("Avoid using Array as root value for ".concat(shallow ? "shallowReactive()" : "reactive()", " as it cannot be tracked in watch() or watchEffect(). Use ").concat(shallow ? "shallowRef()" : "ref()", " instead. This is a Vue-2-only limitation."));
-              }
-              var existingOb = target && target.__ob__;
-              if (existingOb && existingOb.shallow !== shallow) {
-                  warn$2("Target is already a ".concat(existingOb.shallow ? "" : "non-", "shallow reactive object, and cannot be converted to ").concat(shallow ? "" : "non-", "shallow."));
-              }
-          }
-          var ob = observe(target, shallow, isServerRendering() /* ssr mock reactivity */);
-          if (!ob) {
-              if (target == null || isPrimitive(target)) {
-                  warn$2("value cannot be made reactive: ".concat(String(target)));
-              }
-              if (isCollectionType(target)) {
-                  warn$2("Vue 2 does not support reactive collection types such as Map or Set.");
-              }
-          }
-      }
-  }
-  function isReactive(value) {
-      if (isReadonly(value)) {
-          return isReactive(value["__v_raw" /* ReactiveFlags.RAW */]);
-      }
-      return !!(value && value.__ob__);
-  }
-  function isShallow(value) {
-      return !!(value && value.__v_isShallow);
-  }
-  function isReadonly(value) {
-      return !!(value && value.__v_isReadonly);
-  }
-  function isProxy(value) {
-      return isReactive(value) || isReadonly(value);
-  }
-  function toRaw(observed) {
-      var raw = observed && observed["__v_raw" /* ReactiveFlags.RAW */];
-      return raw ? toRaw(raw) : observed;
-  }
-  function markRaw(value) {
-      if (isObject(value)) {
-          rawMap.set(value, true);
-      }
-      return value;
-  }
-  /**
-   * @internal
-   */
-  function isCollectionType(value) {
-      var type = toRawType(value);
-      return (type === 'Map' || type === 'WeakMap' || type === 'Set' || type === 'WeakSet');
-  }
-
   var arrayKeys = Object.getOwnPropertyNames(arrayMethods);
-  var NO_INIITIAL_VALUE = {};
+  var NO_INITIAL_VALUE = {};
   /**
    * In some cases we may want to disable observation inside a component's
    * update computation.
@@ -985,9 +924,8 @@
           // this.value = value
           this.dep = mock ? mockDep : new Dep();
           this.vmCount = 0;
-          def(value, '__ob__', this); // 等同于value.__ob__ = this, 这个def的意思就是把Observer实例绑定到Data的__ob__属性上去
+          def(value, '__ob__', this);
           if (isArray(value)) {
-              // 如果是数组，将修改后可以截获响应的数组方法替换掉该数组的原型中的原生方法，达到监听数组数据变化响应的效果。
               if (!mock) {
                   if (hasProto) {
                       value.__proto__ = arrayMethods;
@@ -1001,7 +939,6 @@
                   }
               }
               if (!shallow) {
-                  // 如果是数组则需要遍历数组的每一个成员进行observe
                   this.observeArray(value);
               }
           }
@@ -1011,11 +948,10 @@
                * getter/setters. This method should only be called when
                * value type is Object.
                */
-              // 如果是对象则直接defineReactive,劫持data的getter和setter
               var keys = Object.keys(value);
               for (var i = 0; i < keys.length; i++) {
                   var key = keys[i];
-                  defineReactive(value, key, NO_INIITIAL_VALUE, undefined, shallow, mock);
+                  defineReactive(value, key, NO_INITIAL_VALUE, undefined, shallow, mock);
               }
           }
       }
@@ -1036,51 +972,42 @@
    * or the existing observer if the value already has one.
    */
   function observe(value, shallow, ssrMockReactivity) {
-      // 判断是否有__ob__观察者对象，
-      // 这里用__ob__这个属性来判断是否已经有Observer实例，如果没有Observer实例则会新建一个Observer实例并赋值给__ob__这个属性，如果已有Observer实例则直接返回该Observer实例
       if (value && hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
           return value.__ob__;
       }
       if (shouldObserve &&
-          (ssrMockReactivity || !isServerRendering()) && // isServerRendering 不是服务器端渲染
-          (isArray(value) || isPlainObject(value)) && // data必须是Array 或者 Object
-          Object.isExtensible(value) && // data对象必须是可扩展的（可以额外添加属性）
+          (ssrMockReactivity || !isServerRendering()) &&
+          (isArray(value) || isPlainObject(value)) &&
+          Object.isExtensible(value) &&
           !value.__v_skip /* ReactiveFlags.SKIP */ &&
-          !rawMap.has(value) &&
           !isRef(value) &&
           !(value instanceof VNode)) {
-          // 为数据对象添加ob属性，而这个属性就是一个Observer对象的实例
-          // 创建一个Observer实例，绑定data进行监听
           return new Observer(value, shallow, ssrMockReactivity);
       }
   }
   /**
    * Define a reactive property on an Object.
    */
-  function defineReactive(obj, key, val, customSetter, shallow, mock) {
-      // 在闭包中定义一个dep对象
+  function defineReactive(obj, key, val, customSetter, shallow, mock, observeEvenIfShallow) {
+      if (observeEvenIfShallow === void 0) { observeEvenIfShallow = false; }
       var dep = new Dep();
       var property = Object.getOwnPropertyDescriptor(obj, key);
       if (property && property.configurable === false) {
           return;
       }
       // cater for pre-defined getter/setters
-      // 如果之前该对象已经预设了getter以及setter函数则将其取出来，新定义的getter/setter中会将其执行，保证不会覆盖之前已经定义的getter/setter。
       var getter = property && property.get;
       var setter = property && property.set;
       if ((!getter || setter) &&
-          (val === NO_INIITIAL_VALUE || arguments.length === 2)) {
+          (val === NO_INITIAL_VALUE || arguments.length === 2)) {
           val = obj[key];
       }
-      // 对象的子对象也会进行observe
-      var childOb = !shallow && observe(val, false, mock);
+      var childOb = shallow ? val && val.__ob__ : observe(val, false, mock);
       Object.defineProperty(obj, key, {
           enumerable: true,
           configurable: true,
           get: function reactiveGetter() {
-              // 如果原本对象拥有getter方法则执行
               var value = getter ? getter.call(obj) : val;
-              // Dep.target：全局属性，用于指向某一个watcher，用完即丢
               if (Dep.target) {
                   {
                       dep.depend({
@@ -1120,7 +1047,7 @@
               else {
                   val = newVal;
               }
-              childOb = !shallow && observe(newVal, false, mock);
+              childOb = shallow ? newVal && newVal.__ob__ : observe(newVal, false, mock);
               {
                   dep.notify({
                       type: "set" /* TriggerOpTypes.SET */,
@@ -1224,6 +1151,77 @@
               dependArray(e);
           }
       }
+  }
+
+  function reactive(target) {
+      makeReactive(target, false);
+      return target;
+  }
+  /**
+   * Return a shallowly-reactive copy of the original object, where only the root
+   * level properties are reactive. It also does not auto-unwrap refs (even at the
+   * root level).
+   */
+  function shallowReactive(target) {
+      makeReactive(target, true);
+      def(target, "__v_isShallow" /* ReactiveFlags.IS_SHALLOW */, true);
+      return target;
+  }
+  function makeReactive(target, shallow) {
+      // if trying to observe a readonly proxy, return the readonly version.
+      if (!isReadonly(target)) {
+          {
+              if (isArray(target)) {
+                  warn$2("Avoid using Array as root value for ".concat(shallow ? "shallowReactive()" : "reactive()", " as it cannot be tracked in watch() or watchEffect(). Use ").concat(shallow ? "shallowRef()" : "ref()", " instead. This is a Vue-2-only limitation."));
+              }
+              var existingOb = target && target.__ob__;
+              if (existingOb && existingOb.shallow !== shallow) {
+                  warn$2("Target is already a ".concat(existingOb.shallow ? "" : "non-", "shallow reactive object, and cannot be converted to ").concat(shallow ? "" : "non-", "shallow."));
+              }
+          }
+          var ob = observe(target, shallow, isServerRendering() /* ssr mock reactivity */);
+          if (!ob) {
+              if (target == null || isPrimitive(target)) {
+                  warn$2("value cannot be made reactive: ".concat(String(target)));
+              }
+              if (isCollectionType(target)) {
+                  warn$2("Vue 2 does not support reactive collection types such as Map or Set.");
+              }
+          }
+      }
+  }
+  function isReactive(value) {
+      if (isReadonly(value)) {
+          return isReactive(value["__v_raw" /* ReactiveFlags.RAW */]);
+      }
+      return !!(value && value.__ob__);
+  }
+  function isShallow(value) {
+      return !!(value && value.__v_isShallow);
+  }
+  function isReadonly(value) {
+      return !!(value && value.__v_isReadonly);
+  }
+  function isProxy(value) {
+      return isReactive(value) || isReadonly(value);
+  }
+  function toRaw(observed) {
+      var raw = observed && observed["__v_raw" /* ReactiveFlags.RAW */];
+      return raw ? toRaw(raw) : observed;
+  }
+  function markRaw(value) {
+      // non-extensible objects won't be observed anyway
+      if (Object.isExtensible(value)) {
+          def(value, "__v_skip" /* ReactiveFlags.SKIP */, true);
+      }
+      return value;
+  }
+  /**
+   * @internal
+   */
+  function isCollectionType(value) {
+      var type = toRawType(value);
+      return (type === 'Map' || type === 'WeakMap' || type === 'Set' || type === 'WeakSet');
   }
 
   /**
@@ -1361,8 +1359,8 @@
       return ref;
   }
 
-  var rawToReadonlyMap = new WeakMap();
-  var rawToShallowReadonlyMap = new WeakMap();
+  var rawToReadonlyFlag = "__v_rawToReadonly";
+  var rawToShallowReadonlyFlag = "__v_rawToShallowReadonly";
   function readonly(target) {
       return createReadonly(target, false);
   }
@@ -1381,18 +1379,21 @@
           }
           return target;
       }
+      if (!Object.isExtensible(target)) {
+          warn$2("Vue 2 does not support creating readonly proxy for non-extensible object.");
+      }
       // already a readonly object
       if (isReadonly(target)) {
           return target;
       }
       // already has a readonly proxy
-      var map = shallow ? rawToShallowReadonlyMap : rawToReadonlyMap;
-      var existingProxy = map.get(target);
+      var existingFlag = shallow ? rawToShallowReadonlyFlag : rawToReadonlyFlag;
+      var existingProxy = target[existingFlag];
       if (existingProxy) {
           return existingProxy;
       }
       var proxy = Object.create(Object.getPrototypeOf(target));
-      map.set(target, proxy);
+      def(target, existingFlag, proxy);
       def(proxy, "__v_isReadonly" /* ReactiveFlags.IS_READONLY */, true);
       def(proxy, "__v_raw" /* ReactiveFlags.RAW */, target);
       if (isRef(target)) {
@@ -2509,11 +2510,10 @@
           // to the data on the placeholder node.
           vm.$vnode = _parentVnode;
           // render self
+          var prevInst = currentInstance;
+          var prevRenderInst = currentRenderingInstance;
           var vnode;
           try {
-              // There's no need to maintain a stack because all render fns are called
-              // separately from one another. Nested component's render fns are called
-              // when parent component is patched.
               setCurrentInstance(vm);
               currentRenderingInstance = vm;
               vnode = render.call(vm._renderProxy, vm.$createElement);
@@ -2537,8 +2537,8 @@
               }
           }
           finally {
-              currentRenderingInstance = null;
-              setCurrentInstance();
+              currentRenderingInstance = prevRenderInst;
+              setCurrentInstance(prevInst);
           }
           // if the returned array contains only a single node, allow it
           if (isArray(vnode) && vnode.length === 1) {
@@ -2801,6 +2801,112 @@
           }
           return vm;
       };
+  }
+
+  var activeEffectScope;
+  var EffectScope = /** @class */ (function () {
+      function EffectScope(detached) {
+          if (detached === void 0) { detached = false; }
+          this.detached = detached;
+          /**
+           * @internal
+           */
+          this.active = true;
+          /**
+           * @internal
+           */
+          this.effects = [];
+          /**
+           * @internal
+           */
+          this.cleanups = [];
+          this.parent = activeEffectScope;
+          if (!detached && activeEffectScope) {
+              this.index =
+                  (activeEffectScope.scopes || (activeEffectScope.scopes = [])).push(this) - 1;
+          }
+      }
+      EffectScope.prototype.run = function (fn) {
+          if (this.active) {
+              var currentEffectScope = activeEffectScope;
+              try {
+                  activeEffectScope = this;
+                  return fn();
+              }
+              finally {
+                  activeEffectScope = currentEffectScope;
+              }
+          }
+          else {
+              warn$2("cannot run an inactive effect scope.");
+          }
+      };
+      /**
+       * This should only be called on non-detached scopes
+       * @internal
+       */
+      EffectScope.prototype.on = function () {
+          activeEffectScope = this;
+      };
+      /**
+       * This should only be called on non-detached scopes
+       * @internal
+       */
+      EffectScope.prototype.off = function () {
+          activeEffectScope = this.parent;
+      };
+      EffectScope.prototype.stop = function (fromParent) {
+          if (this.active) {
+              var i = void 0, l = void 0;
+              for (i = 0, l = this.effects.length; i < l; i++) {
+                  this.effects[i].teardown();
+              }
+              for (i = 0, l = this.cleanups.length; i < l; i++) {
+                  this.cleanups[i]();
+              }
+              if (this.scopes) {
+                  for (i = 0, l = this.scopes.length; i < l; i++) {
+                      this.scopes[i].stop(true);
+                  }
+              }
+              // nested scope, dereference from parent to avoid memory leaks
+              if (!this.detached && this.parent && !fromParent) {
+                  // optimized O(1) removal
+                  var last = this.parent.scopes.pop();
+                  if (last && last !== this) {
+                      this.parent.scopes[this.index] = last;
+                      last.index = this.index;
+                  }
+              }
+              this.parent = undefined;
+              this.active = false;
+          }
+      };
+      return EffectScope;
+  }());
+  function effectScope(detached) {
+      return new EffectScope(detached);
+  }
+  /**
+   * @internal
+   */
+  function recordEffectScope(effect, scope) {
+      if (scope === void 0) { scope = activeEffectScope; }
+      if (scope && scope.active) {
+          scope.effects.push(effect);
+      }
+  }
+  function getCurrentScope() {
+      return activeEffectScope;
+  }
+  function onScopeDispose(fn) {
+      if (activeEffectScope) {
+          activeEffectScope.cleanups.push(fn);
+      }
+      else {
+          warn$2("onScopeDispose() is called when there is no active effect scope" +
+              " to be associated with.");
+      }
   }
 
   var activeInstance = null;
@@ -3105,7 +3211,8 @@
       if (setContext === void 0) { setContext = true; }
       // #7573 disable dep collection when invoking lifecycle hooks
       pushTarget();
-      var prev = currentInstance;
+      var prevInst = currentInstance;
+      var prevScope = getCurrentScope();
       setContext && setCurrentInstance(vm);
       var handlers = vm.$options[hook];
       var info = "".concat(hook, " hook");
@@ -3117,7 +3224,10 @@
       if (vm._hasHookEvent) {
           vm.$emit('hook:' + hook);
       }
-      setContext && setCurrentInstance(prev);
+      if (setContext) {
+          setCurrentInstance(prevInst);
+          prevScope && prevScope.on();
+      }
       popTarget();
   }
 
@@ -3335,7 +3445,10 @@
       var instance = currentInstance;
       var call = function (fn, type, args) {
           if (args === void 0) { args = null; }
-          return invokeWithErrorHandling(fn, null, args, instance, type);
+          var res = invokeWithErrorHandling(fn, null, args, instance, type);
+          if (deep && res && res.__ob__)
+              res.__ob__.dep.depend();
+          return res;
       };
       var getter;
       var forceTrigger = false;
@@ -3360,6 +3473,7 @@
                       return s.value;
                   }
                   else if (isReactive(s)) {
+                      s.__ob__.dep.depend();
                       return traverse(s);
                   }
                   else if (isFunction(s)) {
@@ -3501,112 +3615,6 @@
       return function () {
           watcher.teardown();
       };
-  }
-
-  var activeEffectScope;
-  var EffectScope = /** @class */ (function () {
-      function EffectScope(detached) {
-          if (detached === void 0) { detached = false; }
-          this.detached = detached;
-          /**
-           * @internal
-           */
-          this.active = true;
-          /**
-           * @internal
-           */
-          this.effects = [];
-          /**
-           * @internal
-           */
-          this.cleanups = [];
-          this.parent = activeEffectScope;
-          if (!detached && activeEffectScope) {
-              this.index =
-                  (activeEffectScope.scopes || (activeEffectScope.scopes = [])).push(this) - 1;
-          }
-      }
-      EffectScope.prototype.run = function (fn) {
-          if (this.active) {
-              var currentEffectScope = activeEffectScope;
-              try {
-                  activeEffectScope = this;
-                  return fn();
-              }
-              finally {
-                  activeEffectScope = currentEffectScope;
-              }
-          }
-          else {
-              warn$2("cannot run an inactive effect scope.");
-          }
-      };
-      /**
-       * This should only be called on non-detached scopes
-       * @internal
-       */
-      EffectScope.prototype.on = function () {
-          activeEffectScope = this;
-      };
-      /**
-       * This should only be called on non-detached scopes
-       * @internal
-       */
-      EffectScope.prototype.off = function () {
-          activeEffectScope = this.parent;
-      };
-      EffectScope.prototype.stop = function (fromParent) {
-          if (this.active) {
-              var i = void 0, l = void 0;
-              for (i = 0, l = this.effects.length; i < l; i++) {
-                  this.effects[i].teardown();
-              }
-              for (i = 0, l = this.cleanups.length; i < l; i++) {
-                  this.cleanups[i]();
-              }
-              if (this.scopes) {
-                  for (i = 0, l = this.scopes.length; i < l; i++) {
-                      this.scopes[i].stop(true);
-                  }
-              }
-              // nested scope, dereference from parent to avoid memory leaks
-              if (!this.detached && this.parent && !fromParent) {
-                  // optimized O(1) removal
-                  var last = this.parent.scopes.pop();
-                  if (last && last !== this) {
-                      this.parent.scopes[this.index] = last;
-                      last.index = this.index;
-                  }
-              }
-              this.parent = undefined;
-              this.active = false;
-          }
-      };
-      return EffectScope;
-  }());
-  function effectScope(detached) {
-      return new EffectScope(detached);
-  }
-  /**
-   * @internal
-   */
-  function recordEffectScope(effect, scope) {
-      if (scope === void 0) { scope = activeEffectScope; }
-      if (scope && scope.active) {
-          scope.effects.push(effect);
-      }
-  }
-  function getCurrentScope() {
-      return activeEffectScope;
-  }
-  function onScopeDispose(fn) {
-      if (activeEffectScope) {
-          activeEffectScope.cleanups.push(fn);
-      }
-      else {
-          warn$2("onScopeDispose() is called when there is no active effect scope" +
-              " to be associated with.");
-      }
   }
 
   function provide(key, value) {
@@ -3903,7 +3911,7 @@
       suspensible = _b === void 0 ? false : _b, // in Vue 3 default is true
       userOnError = source.onError;
       if (suspensible) {
-          warn$2("The suspensiblbe option for async components is not supported in Vue2. It is ignored.");
+          warn$2("The suspensible option for async components is not supported in Vue2. It is ignored.");
       }
       var pendingRequest = null;
       var retries = 0;
@@ -4006,7 +4014,7 @@
   /**
    * Note: also update dist/vue.runtime.mjs when adding new exports to this file.
    */
-  var version = '2.7.13';
+  var version = '2.7.16';
   /**
    * @internal type is manually declared in <root>/types/v3-define-component.d.ts
    */
@@ -4383,7 +4391,7 @@
                           "Instead, use a data or computed property based on the prop's " +
                           "value. Prop being mutated: \"".concat(key, "\""), vm);
                   }
-              });
+              }, true /* shallow */);
           }
           // static props are already proxied on the component's prototype
           // during Vue.extend(). We only need to proxy props defined at
@@ -4397,10 +4405,8 @@
       }
       toggleObserving(true);
   }
-  // 首次获取data数据
   function initData(vm) {
       var data = vm.$options.data;
-      // 1. 判断data是不是一个函数
       data = vm._data = isFunction(data) ? getData(data, vm) : data || {};
       if (!isPlainObject(data)) {
           data = {};
@@ -4408,7 +4414,6 @@
                   'https://v2.vuejs.org/v2/guide/components.html#data-Must-Be-a-Function', vm);
       }
       // proxy data on instance
-      // 通过proxy代理，将我们写的this.×××代理成this._data.×××
       var keys = Object.keys(data);
       var props = vm.$options.props;
       var methods = vm.$options.methods;
@@ -4702,6 +4707,9 @@
           vm.__v_skip = true;
           // effect scope
           vm._scope = new EffectScope(true /* detached */);
+          // #13134 edge case where a child component is manually created during the
+          // render of a parent component
+          vm._scope.parent = undefined;
           vm._scope._vm = true;
           // merge options
           if (options && options._isComponent) {
@@ -5211,7 +5219,8 @@
   /**
    * Helper that recursively merges two data objects together.
    */
-  function mergeData(to, from) {
+  function mergeData(to, from, recursive) {
+      if (recursive === void 0) { recursive = true; }
       if (!from)
           return to;
       var key, toVal, fromVal;
@@ -5225,7 +5234,7 @@
               continue;
           toVal = to[key];
           fromVal = from[key];
-          if (!hasOwn(to, key)) {
+          if (!recursive || !hasOwn(to, key)) {
               set(to, key, fromVal);
           }
           else if (toVal !== fromVal &&
@@ -5385,7 +5394,19 @@
                           extend(ret, childVal);
                       return ret;
                   };
-  strats.provide = mergeDataOrFn;
+  strats.provide = function (parentVal, childVal) {
+      if (!parentVal)
+          return childVal;
+      return function () {
+          var ret = Object.create(null);
+          mergeData(ret, isFunction(parentVal) ? parentVal.call(this) : parentVal);
+          if (childVal) {
+              mergeData(ret, isFunction(childVal) ? childVal.call(this) : childVal, false // non-recursive
+              );
+          }
+          return ret;
+      };
+  };
   /**
    * Default strategy.
    */
@@ -5935,7 +5956,7 @@
       return false;
   }
   function pruneCache(keepAliveInstance, filter) {
-      var cache = keepAliveInstance.cache, keys = keepAliveInstance.keys, _vnode = keepAliveInstance._vnode;
+      var cache = keepAliveInstance.cache, keys = keepAliveInstance.keys, _vnode = keepAliveInstance._vnode, $vnode = keepAliveInstance.$vnode;
       for (var key in cache) {
           var entry = cache[key];
           if (entry) {
@@ -5945,9 +5966,10 @@
               }
           }
       }
+      $vnode.componentOptions.children = undefined;
   }
   function pruneCacheEntry(cache, key, keys, current) {
-      var entry = cache[key];
+      var entry = cache[key]; // 缓存list中的第一个组件
       if (entry && (!current || entry.tag !== current.tag)) {
           // @ts-expect-error can be undefined
           entry.componentInstance.$destroy();
@@ -5964,47 +5986,6 @@
           include: patternTypes,
           exclude: patternTypes,
           max: [String, Number]
-      },
-      methods: {
-          cacheVNode: function () {
-              var _a = this, cache = _a.cache, keys = _a.keys, vnodeToCache = _a.vnodeToCache, keyToCache = _a.keyToCache;
-              if (vnodeToCache) {
-                  var tag = vnodeToCache.tag, componentInstance = vnodeToCache.componentInstance, componentOptions = vnodeToCache.componentOptions;
-                  cache[keyToCache] = {
-                      name: _getComponentName(componentOptions),
-                      tag: tag,
-                      componentInstance: componentInstance
-                  };
-                  keys.push(keyToCache);
-                  // prune oldest entry
-                  if (this.max && keys.length > parseInt(this.max)) {
-                      pruneCacheEntry(cache, keys[0], keys, this._vnode);
-                  }
-                  this.vnodeToCache = null;
-              }
-          }
-      },
-      created: function () {
-          this.cache = Object.create(null);
-          this.keys = [];
-      },
-      destroyed: function () {
-          for (var key in this.cache) {
-              pruneCacheEntry(this.cache, key, this.keys);
-          }
-      },
-      mounted: function () {
-          var _this = this;
-          this.cacheVNode();
-          this.$watch('include', function (val) {
-              pruneCache(_this, function (name) { return matches(val, name); });
-          });
-          this.$watch('exclude', function (val) {
-              pruneCache(_this, function (name) { return !matches(val, name); });
-          });
-      },
-      updated: function () {
-          this.cacheVNode();
       },
       render: function () {
           var slot = this.$slots.default;
@@ -6043,6 +6024,55 @@
               vnode.data.keepAlive = true;
           }
           return vnode || (slot && slot[0]);
+      },
+      created: function () {
+          this.cache = Object.create(null);
+          this.keys = [];
+      },
+      mounted: function () {
+          var _this = this;
+          this.cacheVNode();
+          this.$watch('include', function (val) {
+              pruneCache(_this, function (name) { return matches(val, name); });
+          });
+          this.$watch('exclude', function (val) {
+              pruneCache(_this, function (name) { return !matches(val, name); });
+          });
+      },
+      updated: function () {
+          this.cacheVNode();
+      },
+      methods: {
+          cacheVNode: function () {
+              /*
+              * cache vue实例中keep-alive 缓存组件list
+              * keys 缓存组件名称list
+              * vnodeToCache
+              * keyToCache
+              * */
+              var _a = this, cache = _a.cache, keys = _a.keys, vnodeToCache = _a.vnodeToCache, keyToCache = _a.keyToCache;
+              if (vnodeToCache) {
+                  console.log('keep-alive', vnodeToCache, this);
+                  var tag = vnodeToCache.tag, componentInstance = vnodeToCache.componentInstance, componentOptions = vnodeToCache.componentOptions;
+                  cache[keyToCache] = {
+                      name: _getComponentName(componentOptions),
+                      tag: tag,
+                      componentInstance: componentInstance
+                  };
+                  keys.push(keyToCache);
+                  // prune oldest entry
+                  // 如果超出最大缓存数
+                  if (this.max && keys.length > parseInt(this.max)) {
+                      pruneCacheEntry(cache, keys[0], keys, this._vnode);
+                  }
+                  this.vnodeToCache = null;
+              }
+          }
+      },
+      destroyed: function () {
+          for (var key in this.cache) {
+              pruneCacheEntry(this.cache, key, this.keys);
+          }
       }
   };
 
@@ -6266,7 +6296,7 @@
       }
       var el = document.createElement(tag);
       if (tag.indexOf('-') > -1) {
-          // http://stackoverflow.com/a/28210364/1070244
+          // https://stackoverflow.com/a/28210364/1070244
           return (unknownElementCache[tag] =
               el.constructor === window.HTMLUnknownElement ||
                   el.constructor === window.HTMLElement);
@@ -7141,8 +7171,11 @@
                               var insert_1 = ancestor.data.hook.insert;
                               if (insert_1.merged) {
                                   // start at index 1 to avoid re-invoking component mounted hook
-                                  for (var i_10 = 1; i_10 < insert_1.fns.length; i_10++) {
-                                      insert_1.fns[i_10]();
+                                  // clone insert hooks to avoid being mutated during iteration.
+                                  // e.g. for customed directives under transition group.
+                                  var cloned = insert_1.fns.slice(1);
+                                  for (var i_10 = 0; i_10 < cloned.length; i_10++) {
+                                      cloned[i_10]();
                                   }
                               }
                           }
@@ -8281,10 +8314,8 @@
       }
       for (name in newStyle) {
           cur = newStyle[name];
-          if (cur !== oldStyle[name]) {
-              // ie9 setting to null has no effect, must use empty string
-              setProp(el, name, cur == null ? '' : cur);
-          }
+          // ie9 setting to null has no effect, must use empty string
+          setProp(el, name, cur == null ? '' : cur);
       }
   }
   var style$1 = {
@@ -9320,16 +9351,20 @@
               }
               else {
                   // @ts-expect-error
-                  console[console.info ? 'info' : 'log']('Download the Vue Devtools extension for a better development experience:\n' +
-                      'https://github.com/vuejs/vue-devtools');
+                  console[console.info ? 'info' : 'log'](
+                  // 'Download the Vue Devtools extension for a better development experience:\n' +
+                  //   'https://github.com/vuejs/vue-devtools'
+                  );
               }
           }
           if (config.productionTip !== false &&
               typeof console !== 'undefined') {
               // @ts-expect-error
-              console[console.info ? 'info' : 'log']("You are running Vue in development mode.\n" +
-                  "Make sure to turn on production mode when deploying for production.\n" +
-                  "See more tips at https://vuejs.org/guide/deployment.html");
+              console[console.info ? 'info' : 'log'](
+              // `You are running Vue in development mode.\n` +
+              //   `Make sure to turn on production mode when deploying for production.\n` +
+              //   `See more tips at https://vuejs.org/guide/deployment.html`
+              );
           }
       }, 0);
   }
@@ -9514,29 +9549,32 @@
       var canBeLeftOpenTag = options.canBeLeftOpenTag || no;
       var index = 0;
       var last, lastTag;
+      console.log('parseHTML获取到的HTML，并开始对HTML串进行循环', html);
+      console.table(options);
       var _loop_1 = function () {
+          console.log('=============', html);
           last = html;
-          // console.log('html', html)
           // Make sure we're not in a plaintext content element like script/style
+          console.log('=============', !lastTag || !isPlainTextElement(lastTag));
           if (!lastTag || !isPlainTextElement(lastTag)) {
               var textEnd = html.indexOf('<');
-              if (textEnd === 0) { // 如果第一个就是注释符
-                  // Comment(注释):  <!-- / <![
+              console.log('=============', textEnd);
+              if (textEnd === 0) {
+                  // Comment:
+                  console.log('是否是注释起始标签<!--', comment.test(html));
                   if (comment.test(html)) {
                       var commentEnd = html.indexOf('-->');
                       if (commentEnd >= 0) {
+                          // 是否保留注释
                           if (options.shouldKeepComment && options.comment) {
-                              options.comment(html.substring(4, commentEnd), // <!-- 注释的内容 -->
-                              index, // 注释第一个index
-                              index + commentEnd + 3 // 注释最后一个index
-                              );
+                              options.comment(html.substring(4, commentEnd), index, index + commentEnd + 3);
                           }
-                          advance(commentEnd + 3); // 重新设置 HTML 为去掉注释的
+                          // advance: 删除注释
+                          advance(commentEnd + 3);
                           return "continue";
                       }
                   }
-                  // http://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
-                  // conditionalComment： <![   （IE 6的注释） ---这里貌似是直接删除掉，没做处理
+                  // console.log('是否是注释起始标签['，是则截取掉)
                   if (conditionalComment.test(html)) {
                       var conditionalEnd = html.indexOf(']>');
                       if (conditionalEnd >= 0) {
@@ -9544,20 +9582,15 @@
                           return "continue";
                       }
                   }
-                  // Doctype(文档类型): <!DOCTYPE html>
+                  // Doctype:
+                  // 是否是 Doctype 标签， 是则截取掉
                   var doctypeMatch = html.match(doctype);
                   if (doctypeMatch) {
                       advance(doctypeMatch[0].length);
                       return "continue";
                   }
                   // End tag:
-                  // const ncname = `[a-zA-Z_][\\-\\.0-9_a-zA-Z${unicodeRegExp.source}]*`
-                  // const qnameCapture = `((?:${ncname}\\:)?${ncname})`
-                  // const startTagOpen = new RegExp(`^<${qnameCapture}`)
-                  // const startTagClose = /^\s*(\/?)>/
-                  // const endTag = new RegExp(`^<\\/${qnameCapture}[^>]*>`)
                   var endTagMatch = html.match(endTag);
-                  // console.log('endTagMatch', endTagMatch)
                   if (endTagMatch) {
                       var curIndex = index;
                       advance(endTagMatch[0].length);
@@ -9566,7 +9599,6 @@
                   }
                   // Start tag:
                   var startTagMatch = parseStartTag();
-                  // console.log('startTagMatch', startTagMatch)
                   if (startTagMatch) {
                       handleStartTag(startTagMatch);
                       if (shouldIgnoreFirstNewline(startTagMatch.tagName, html)) {
@@ -9892,13 +9924,18 @@
           }
       }
       function trimEndingWhitespace(el) {
+          console.log('去除空节点', el, inPre);
           // remove trailing whitespace node
           if (!inPre) {
-              var lastNode = void 0;
+              var lastNode 
+              // console.log('111111', el.children, [el.children.length - 1])
+              = void 0;
+              // console.log('111111', el.children, [el.children.length - 1])
               while ((lastNode = el.children[el.children.length - 1]) &&
                   lastNode.type === 3 &&
                   lastNode.text === ' ') {
-                  el.children.pop();
+                  console.log('满足去除空节点', lastNode, el.children.pop());
+                  // el.children.pop()
               }
           }
       }
@@ -10084,11 +10121,7 @@
                   }
               }
           },
-          // 保存的注释<!-- --> 的AST数据结构
           comment: function (text, start, end) {
-              //text: <!-- 注释的内容 -->
-              //start: // 注释第一个index
-              //end: // 注释最后一个index
               // adding anything as a sibling to the root node is forbidden
               // comments should still be allowed, but ignored
               if (currentParent) {
@@ -10105,9 +10138,9 @@
               }
           }
       });
-      // console.log('root', root)
       return root;
   }
+  // v-pre指令的处理
   function processPre(el) {
       if (getAndRemoveAttr(el, 'v-pre') != null) {
           el.pre = true;
@@ -10296,7 +10329,9 @@
       }
       // slot="xxx"
       var slotTarget = getBindingAttr(el, 'slot');
+      console.log('slot="xxx"', slotTarget);
       if (slotTarget) {
+          console.log('slot="xxx"');
           el.slotTarget = slotTarget === '""' ? '"default"' : slotTarget;
           el.slotTargetDynamic = !!(el.attrsMap[':slot'] || el.attrsMap['v-bind:slot']);
           // preserve slot as an attribute for native shadow DOM compat
@@ -10307,6 +10342,7 @@
       }
       // 2.6 v-slot syntax
       {
+          console.log('v-slot syntax');
           if (el.tag === 'template') {
               // v-slot on <template>
               var slotBinding = getAndRemoveAttrByRegex(el, slotRE);
@@ -10702,10 +10738,8 @@
       isStaticKey = genStaticKeysCached(options.staticKeys || '');
       isPlatformReservedTag = options.isReservedTag || no;
       // first pass: mark all non-static nodes.
-      // 所有类型type === 1(所有非静态节点)添加static属性
       markStatic(root);
       // second pass: mark static roots.
-      // 标记静态根
       markStaticRoots(root, false);
   }
   function genStaticKeys(keys) {
@@ -10713,7 +10747,6 @@
           (keys ? ',' + keys : ''));
   }
   function markStatic(node) {
-      // 添加static属性
       node.static = isStatic(node);
       if (node.type === 1) {
           // do not make component slot content static. this avoids
@@ -10991,7 +11024,6 @@
   }());
   function generate(ast, options) {
       var state = new CodegenState(options);
-      // console.log('state', state)
       // fix #11483, Root level <script> tags should not be rendered.
       var code = ast
           ? ast.tag === 'script'
@@ -11007,7 +11039,6 @@
       if (el.parent) {
           el.pre = el.pre || el.parent.pre;
       }
-      // console.log('el', el)
       if (el.staticRoot && !el.staticProcessed) {
           return genStatic(el, state);
       }
@@ -11799,17 +11830,14 @@
   // `createCompilerCreator` allows creating compilers that use alternative
   // parser/optimizer/codegen, e.g the SSR optimizing compiler.
   // Here we just export a default compiler using the default parts.
-  var createCompiler = createCompilerCreator(function baseCompile(template, // template 模板内容
-  options) {
-      // ast 全名：Abstract Syntax Tree，即抽象语法树。是源代码语法结构的一种抽象表示。
-      // 在计算机中，任何问题的本质就是 数据结构 + 算法，ast也是一种数据结构，来描述源代码的一种结构化表示
+  var createCompiler = createCompilerCreator(function baseCompile(template, options) {
+      console.log('获取到的 template', template, options);
+      // parse 主要是将 template 内容转换成AST抽象语法树
       var ast = parse(template.trim(), options);
+      console.log('template 转换后的 AST', ast);
       if (options.optimize !== false) {
-          // 优化AST抽象树,做了一层静态标记优化。给一些不变的节点打上标记，提升后面patch diff的性能。
-          // 所有类型type添加static属性
           optimize(ast, options);
       }
-      // 代码生成阶段，通过ast将转化为render函数
       var code = generate(ast, options);
       return {
           ast: ast,

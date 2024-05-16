@@ -59,7 +59,6 @@ export function generate(
   options: CompilerOptions
 ): CodegenResult {
   const state = new CodegenState(options)
-  // console.log('state', state)
   // fix #11483, Root level <script> tags should not be rendered.
   const code = ast
     ? ast.tag === 'script'
@@ -77,7 +76,6 @@ export function genElement(el: ASTElement, state: CodegenState): string {
     el.pre = el.pre || el.parent.pre
   }
 
-  // console.log('el', el)
   if (el.staticRoot && !el.staticProcessed) {
     return genStatic(el, state)
   } else if (el.once && !el.onceProcessed) {

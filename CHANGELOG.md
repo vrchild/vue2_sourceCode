@@ -1,3 +1,72 @@
+## [2.7.16 Swan Song](https://github.com/vuejs/vue/compare/v2.7.16-beta.2...v2.7.16) (2023-12-24)
+
+
+### Bug Fixes
+
+* **lifecycle:** esnure component effect scopes are disconnected ([56ce7f8](https://github.com/vuejs/vue/commit/56ce7f8c573116ed6683149206cf35c987249d42)), closes [#13134](https://github.com/vuejs/vue/issues/13134)
+
+
+
+## [2.7.16-beta.2](https://github.com/vuejs/vue/compare/v2.7.16-beta.1...v2.7.16-beta.2) (2023-12-14)
+
+
+### Bug Fixes
+
+* account for nested render calls ([db9c566](https://github.com/vuejs/vue/commit/db9c566032da0ec5cd758a3e8525e9733874c1e5)), closes [#13131](https://github.com/vuejs/vue/issues/13131)
+* **types:** export more types for v3 alignment (jsx / component options) ([895669f](https://github.com/vuejs/vue/commit/895669ffa01f8075a326308caa8ad6a5f69a1919)), closes [#13078](https://github.com/vuejs/vue/issues/13078) [#13128](https://github.com/vuejs/vue/issues/13128)
+
+
+
+## [2.7.16-beta.1](https://github.com/vuejs/vue/compare/v2.7.15...v2.7.16-beta.1) (2023-12-08)
+
+
+### Bug Fixes
+
+* **compiler-sfc:** check template `ref` usage,  ([#12985](https://github.com/vuejs/vue/issues/12985)) ([83d9535](https://github.com/vuejs/vue/commit/83d95351a9f809311d624fc3398e7f6829b72447)), closes [#12984](https://github.com/vuejs/vue/issues/12984)
+* **compiler-sfc:** fix rewriteDefault edge cases ([25f97a5](https://github.com/vuejs/vue/commit/25f97a5033187372e7b8c591c79336197ee5c833)), closes [#13060](https://github.com/vuejs/vue/issues/13060) [#12892](https://github.com/vuejs/vue/issues/12892) [#12906](https://github.com/vuejs/vue/issues/12906)
+* **keep-alive:** fix keep-alive memory leak ([2632249](https://github.com/vuejs/vue/commit/2632249925e632e56f6dfc8fdbcf682c82e4081b)), closes [#12827](https://github.com/vuejs/vue/issues/12827)
+* **keep-alive:** fix memory leak without breaking transition tests ([e0747f4](https://github.com/vuejs/vue/commit/e0747f40a879b4000a1959d21377b51d1f1ed988))
+* **props:** should not unwrap props that are raw refs ([08382f0](https://github.com/vuejs/vue/commit/08382f008016c3b3b93f84594266f2e191fee91d)), closes [#12930](https://github.com/vuejs/vue/issues/12930)
+* **shallowReactive:** should track value if already reactive when set in shallowReactive ([0ad8e8d](https://github.com/vuejs/vue/commit/0ad8e8d94f3a3bf4429f25850c85a6bbb2b81364))
+* **style:** always set new styles ([f5ef882](https://github.com/vuejs/vue/commit/f5ef882a781b8a62c9ca00e95006d07636567c8e)), closes [#12901](https://github.com/vuejs/vue/issues/12901) [#12946](https://github.com/vuejs/vue/issues/12946)
+* **types:** fix shallowRef's return type  ([#12979](https://github.com/vuejs/vue/issues/12979)) ([a174c29](https://github.com/vuejs/vue/commit/a174c29dab2cf655b06f7870e0ac5a78ef35ec8a)), closes [#12978](https://github.com/vuejs/vue/issues/12978)
+* **types:** fix type augmentation and compiler-sfc types w/moduleResolution: bundler ([#13107](https://github.com/vuejs/vue/issues/13107)) ([de0b97b](https://github.com/vuejs/vue/commit/de0b97b3eadae120eda505b45df2de2115dcb6f0)), closes [#13106](https://github.com/vuejs/vue/issues/13106)
+* **types:** provide types for built-in components ([3650c12](https://github.com/vuejs/vue/commit/3650c12f7d3a20f3155bc1fd2b068e84289e0d33)), closes [#13002](https://github.com/vuejs/vue/issues/13002)
+* **types:** type VNodeChildren should allow type number  ([#13067](https://github.com/vuejs/vue/issues/13067)) ([24fcf69](https://github.com/vuejs/vue/commit/24fcf69624a633d43dfc0aa5fa6b93d11de7fad5)), closes [#12973](https://github.com/vuejs/vue/issues/12973)
+* **utils:** unwrap refs when stringifying values in template ([ae3e4b1](https://github.com/vuejs/vue/commit/ae3e4b1c706b8d61a4a312ca5d23441df021b4b4)), closes [#12884](https://github.com/vuejs/vue/issues/12884) [#12888](https://github.com/vuejs/vue/issues/12888)
+* **watch:** new property addition should trigger deep watcher with getter ([6d857f5](https://github.com/vuejs/vue/commit/6d857f5bee275dc98106e3b2cbc7722f5ec0cfc0)), closes [#12967](https://github.com/vuejs/vue/issues/12967) [#12972](https://github.com/vuejs/vue/issues/12972)
+
+
+
+## [2.7.15](https://github.com/vuejs/vue/compare/v2.7.14...v2.7.15) (2023-10-23)
+
+
+### Bug Fixes
+
+* **compiler-sfc:** add semicolon after `defineProps` statement ([#12879](https://github.com/vuejs/vue/issues/12879)) ([51fef2c](https://github.com/vuejs/vue/commit/51fef2ca69459c1175e105991f60511f1996e0c8))
+* **compiler-sfc:** fix macro usage in multi-variable declaration ([#12873](https://github.com/vuejs/vue/issues/12873)) ([d27c128](https://github.com/vuejs/vue/commit/d27c128b7cb1640f3aa185a5ecdea4ff35763794))
+* **compiler-sfc:** Optimize the value of emitIdentifier ([#12851](https://github.com/vuejs/vue/issues/12851)) ([bb59751](https://github.com/vuejs/vue/commit/bb59751dd4e45afcaafd607f22505a724b1ef841))
+* **compiler-sfc:** Resolve object expression parsing errors in `v-on` ([#12862](https://github.com/vuejs/vue/issues/12862)) ([b8c8b3f](https://github.com/vuejs/vue/commit/b8c8b3fc7a211744fdabd237a1a986a1f80b7c43))
+* **lifecycle:** scope might changed when call hook ([#13070](https://github.com/vuejs/vue/issues/13070)) ([74ca5a1](https://github.com/vuejs/vue/commit/74ca5a13ba12a31580f1567e7c6d789e96730e46))
+* **patch:** clone insert hooks to avoid being mutated during iteration ([#12905](https://github.com/vuejs/vue/issues/12905)) ([c223634](https://github.com/vuejs/vue/commit/c22363425ae246ccbb8418342e94edfa270d93e5))
+* **types/sfc:** improve the type inference using `withDefaults` ([#12872](https://github.com/vuejs/vue/issues/12872)) ([099401e](https://github.com/vuejs/vue/commit/099401e227fd5ed496ff615528d1a9b3b64d4fbf))
+* **types:** correct serverPrefetch this type ([#13068](https://github.com/vuejs/vue/issues/13068)) ([67c1d26](https://github.com/vuejs/vue/commit/67c1d26cb0af3eb2db0a11fc7768a8299e7f7d58)), closes [#12488](https://github.com/vuejs/vue/issues/12488)
+
+
+
+## [2.7.14](https://github.com/vuejs/vue/compare/v2.7.13...v2.7.14) (2022-11-09)
+
+
+### Bug Fixes
+
+* **compiler-sfc:** fix template usage check edge case for v-slot destructured default value ([#12842](https://github.com/vuejs/vue/issues/12842)) ([5e3d4e9](https://github.com/vuejs/vue/commit/5e3d4e90cdf92ec0a72bbb2bd44125f1faafae1d)), closes [#12841](https://github.com/vuejs/vue/issues/12841)
+* **provide/inject:** do not mutate original provide options during merge ([d1899ca](https://github.com/vuejs/vue/commit/d1899caf688de961e63e7a0d56f806fc4a12efd9)), closes [#12854](https://github.com/vuejs/vue/issues/12854)
+* **reactivity:** avoid using WeakMap for IE compatibility ([29b5f58](https://github.com/vuejs/vue/commit/29b5f588032600baae9854ac9a4105916a5aa648)), closes [#12837](https://github.com/vuejs/vue/issues/12837)
+* **types:** fix spreading VNodeData in tsx ([#12789](https://github.com/vuejs/vue/issues/12789)) ([f7db7f3](https://github.com/vuejs/vue/commit/f7db7f361b6356591781b9f33abbb0d5b7f9b97c)), closes [#12778](https://github.com/vuejs/vue/issues/12778)
+* **types:** stricter type condition for `EventHandlers` ([#12840](https://github.com/vuejs/vue/issues/12840)) ([0b3cf7d](https://github.com/vuejs/vue/commit/0b3cf7dda9ac605b2b9f799acacd2793e974f225)), closes [#12832](https://github.com/vuejs/vue/issues/12832)
+
+
+
 ## [2.7.13](https://github.com/vuejs/vue/compare/v2.7.12...v2.7.13) (2022-10-14)
 
 

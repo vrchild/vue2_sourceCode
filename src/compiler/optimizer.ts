@@ -25,10 +25,8 @@ export function optimize(
   isStaticKey = genStaticKeysCached(options.staticKeys || '')
   isPlatformReservedTag = options.isReservedTag || no
   // first pass: mark all non-static nodes.
-  // 所有类型type === 1(所有非静态节点)添加static属性
   markStatic(root)
   // second pass: mark static roots.
-  // 标记静态根
   markStaticRoots(root, false)
 }
 
@@ -40,7 +38,6 @@ function genStaticKeys(keys: string): Function {
 }
 
 function markStatic(node: ASTNode) {
-  // 添加static属性
   node.static = isStatic(node)
   if (node.type === 1) {
     // do not make component slot content static. this avoids

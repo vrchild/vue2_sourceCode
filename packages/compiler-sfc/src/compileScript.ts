@@ -39,7 +39,7 @@ import { walk } from 'estree-walker'
 import { RawSourceMap } from 'source-map'
 import { warnOnce } from './warn'
 import { isReservedTag } from 'web/util'
-import { bindRE, dirRE, onRE } from 'compiler/parser'
+import { bindRE, dirRE, onRE, slotRE } from 'compiler/parser'
 import { parseText } from 'compiler/parser/text-parser'
 import { DEFAULT_FILENAME } from './parseComponent'
 import {
@@ -414,7 +414,10 @@ export function compileScript(
     }
 
     if (declId) {
-      emitIdentifier = scriptSetup!.content.slice(declId.start!, declId.end!)
+      emitIdentifier =
+        declId.type === 'Identifier'
+          ? declId.name
+          : scriptSetup!.content.slice(declId.start!, declId.end!)
     }
 
     return true
@@ -907,11 +910,11 @@ export function compileScript(
             } else {
               let start = decl.start! + startOffset
               let end = decl.end! + startOffset
-              if (i < total - 1) {
-                // not the last one, locate the start of the next
+              if (i === 0) {
+                // first one, locate the start of the next
                 end = node.declarations[i + 1].start! + startOffset
               } else {
-                // last one, locate the end of the prev
+                // not first one, locate the end of the prev
                 start = node.declarations[i - 1].end! + startOffset
               }
               s.remove(start, end)
@@ -1122,7 +1125,7 @@ export function compileScript(
       startOffset,
       `\nconst ${propsIdentifier} = __props${
         propsTypeDecl ? ` as ${genSetupPropsType(propsTypeDecl)}` : ``
-      }\n`
+      };\n`
     )
   }
   if (propsDestructureRestId) {
@@ -1130,7 +1133,7 @@ export function compileScript(
       startOffset,
       `\nconst ${propsDestructureRestId} = ${helper(
         `createPropsRestProxy`
-      )}(__props, ${JSON.stringify(Object.keys(propsDestructuredBindings))})\n`
+      )}(__props, ${JSON.stringify(Object.keys(propsDestructuredBindings))});\n`
     )
   }
 
@@ -1572,7 +1575,7 @@ function extractRuntimeEmits(
 }
 
 function extractEventNames(
-  eventName: Identifier | RestElement,
+  eventName: ArrayPattern | Identifier | ObjectPattern | RestElement,
   emits: Set<string>
 ) {
   if (
@@ -1804,6 +1807,8 @@ function resolveTemplateUsageCheckString(sfc: SFCDescriptor, isTS: boolean) {
         if (dirRE.test(name)) {
           const baseName = onRE.test(name)
             ? 'on'
+            : slotRE.test(name)
+            ? 'slot'
             : bindRE.test(name)
             ? 'bind'
             : name.replace(dirRE, '')
@@ -1813,6 +1818,8 @@ function resolveTemplateUsageCheckString(sfc: SFCDescriptor, isTS: boolean) {
           if (value) {
             code += `,${processExp(value, isTS, baseName)}`
           }
+        } else if (name === 'ref') {
+          code += `,${value}`
         }
       }
     },
@@ -1836,7 +1843,7 @@ function processExp(exp: string, isTS: boolean, dir?: string): string {
     if (dir === 'slot') {
       exp = `(${exp})=>{}`
     } else if (dir === 'on') {
-      exp = `()=>{${exp}}`
+      exp = `()=>{return ${exp}}`
     } else if (dir === 'for') {
       const inMatch = exp.match(forAliasRE)
       if (inMatch) {

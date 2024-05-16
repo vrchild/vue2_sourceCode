@@ -195,7 +195,6 @@ export type ASTExpression = {
   end?: number
 }
 
-// 注释<!-- --> 的AST数据结构
 export type ASTText = {
   type: 3
   text: string

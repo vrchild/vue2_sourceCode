@@ -1,3 +1,4 @@
+import { StyleValue } from './jsx'
 import { Vue } from './vue'
 import { DirectiveFunction, DirectiveOptions } from './options'
 import { Ref } from './v3-generated'
@@ -21,6 +22,7 @@ type ScopedSlotReturnValue =
   | VNode
   | string
   | boolean
+  | number
   | null
   | undefined
   | ScopedSlotReturnArray
@@ -36,6 +38,7 @@ export type VNodeChildren =
   | [ScopedSlot]
   | string
   | boolean
+  | number
   | null
   | undefined
 export interface VNodeChildrenArrayContents
@@ -85,7 +88,7 @@ export interface VNodeData {
   staticClass?: string
   class?: any
   staticStyle?: { [key: string]: any }
-  style?: string | object[] | object
+  style?: StyleValue
   props?: { [key: string]: any }
   attrs?: { [key: string]: any }
   domProps?: { [key: string]: any }

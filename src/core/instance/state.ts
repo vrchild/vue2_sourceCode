@@ -95,19 +95,25 @@ function initProps(vm: Component, propsOptions: Object) {
           vm
         )
       }
-      defineReactive(props, key, value, () => {
-        if (!isRoot && !isUpdatingChildComponent) {
-          warn(
-            `Avoid mutating a prop directly since the value will be ` +
-              `overwritten whenever the parent component re-renders. ` +
-              `Instead, use a data or computed property based on the prop's ` +
-              `value. Prop being mutated: "${key}"`,
-            vm
-          )
-        }
-      })
+      defineReactive(
+        props,
+        key,
+        value,
+        () => {
+          if (!isRoot && !isUpdatingChildComponent) {
+            warn(
+              `Avoid mutating a prop directly since the value will be ` +
+                `overwritten whenever the parent component re-renders. ` +
+                `Instead, use a data or computed property based on the prop's ` +
+                `value. Prop being mutated: "${key}"`,
+              vm
+            )
+          }
+        },
+        true /* shallow */
+      )
     } else {
-      defineReactive(props, key, value)
+      defineReactive(props, key, value, undefined, true /* shallow */)
     }
     // static props are already proxied on the component's prototype
     // during Vue.extend(). We only need to proxy props defined at
@@ -119,10 +125,8 @@ function initProps(vm: Component, propsOptions: Object) {
   toggleObserving(true)
 }
 
-// 首次获取data数据
 function initData(vm: Component) {
   let data: any = vm.$options.data
-  // 1. 判断data是不是一个函数
   data = vm._data = isFunction(data) ? getData(data, vm) : data || {}
   if (!isPlainObject(data)) {
     data = {}
@@ -134,7 +138,6 @@ function initData(vm: Component) {
       )
   }
   // proxy data on instance
-  // 通过proxy代理，将我们写的this.×××代理成this._data.×××
   const keys = Object.keys(data)
   const props = vm.$options.props
   const methods = vm.$options.methods

@@ -75,32 +75,38 @@ export function parseHTML(html, options: HTMLParserOptions) {
   const canBeLeftOpenTag = options.canBeLeftOpenTag || no
   let index = 0
   let last, lastTag
+  console.log('parseHTML获取到的HTML，并开始对HTML串进行循环', html)
+  console.table(options)
   while (html) {
+    console.log('=============', html)
     last = html
-    // console.log('html', html)
     // Make sure we're not in a plaintext content element like script/style
+    console.log('=============', !lastTag || !isPlainTextElement(lastTag))
     if (!lastTag || !isPlainTextElement(lastTag)) {
       let textEnd = html.indexOf('<')
-      if (textEnd === 0) { // 如果第一个就是注释符
-        // Comment(注释):  <!-- / <![
+      console.log('=============', textEnd)
+      if (textEnd === 0) {
+        // Comment:
+        console.log('是否是注释起始标签<!--', comment.test(html))
         if (comment.test(html)) {
           const commentEnd = html.indexOf('-->')
 
           if (commentEnd >= 0) {
+            // 是否保留注释
             if (options.shouldKeepComment && options.comment) {
               options.comment(
-                html.substring(4, commentEnd), // <!-- 注释的内容 -->
-                index, // 注释第一个index
-                index + commentEnd + 3 // 注释最后一个index
+                html.substring(4, commentEnd),
+                index,
+                index + commentEnd + 3
               )
             }
-            advance(commentEnd + 3) // 重新设置 HTML 为去掉注释的
+            // advance: 删除注释
+            advance(commentEnd + 3)
             continue
           }
         }
 
-        // http://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
-        // conditionalComment： <![   （IE 6的注释） ---这里貌似是直接删除掉，没做处理
+        // console.log('是否是注释起始标签['，是则截取掉)
         if (conditionalComment.test(html)) {
           const conditionalEnd = html.indexOf(']>')
 
@@ -110,7 +116,8 @@ export function parseHTML(html, options: HTMLParserOptions) {
           }
         }
 
-        // Doctype(文档类型): <!DOCTYPE html>
+        // Doctype:
+        // 是否是 Doctype 标签， 是则截取掉
         const doctypeMatch = html.match(doctype)
         if (doctypeMatch) {
           advance(doctypeMatch[0].length)
@@ -118,13 +125,7 @@ export function parseHTML(html, options: HTMLParserOptions) {
         }
 
         // End tag:
-        // const ncname = `[a-zA-Z_][\\-\\.0-9_a-zA-Z${unicodeRegExp.source}]*`
-        // const qnameCapture = `((?:${ncname}\\:)?${ncname})`
-        // const startTagOpen = new RegExp(`^<${qnameCapture}`)
-        // const startTagClose = /^\s*(\/?)>/
-        // const endTag = new RegExp(`^<\\/${qnameCapture}[^>]*>`)
         const endTagMatch = html.match(endTag)
-        // console.log('endTagMatch', endTagMatch)
         if (endTagMatch) {
           const curIndex = index
           advance(endTagMatch[0].length)
@@ -134,7 +135,6 @@ export function parseHTML(html, options: HTMLParserOptions) {
 
         // Start tag:
         const startTagMatch = parseStartTag()
-        // console.log('startTagMatch', startTagMatch)
         if (startTagMatch) {
           handleStartTag(startTagMatch)
           if (shouldIgnoreFirstNewline(startTagMatch.tagName, html)) {

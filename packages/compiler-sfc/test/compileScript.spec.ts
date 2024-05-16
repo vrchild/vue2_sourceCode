@@ -141,6 +141,21 @@ const myEmit = defineEmits(['foo', 'bar'])
     expect(content).toMatch(`emits: ['a'],`)
   })
 
+  // vuejs/core #6757
+  test('defineProps/defineEmits in multi-variable declaration fix #6757 ', () => {
+    const { content } = compile(`
+    <script setup>
+    const a = 1,
+          props = defineProps(['item']),
+          emit = defineEmits(['a']);
+    </script>
+  `)
+    assertCode(content)
+    expect(content).toMatch(`const a = 1;`) // test correct removal
+    expect(content).toMatch(`props: ['item'],`)
+    expect(content).toMatch(`emits: ['a'],`)
+  })
+
   test('defineProps/defineEmits in multi-variable declaration (full removal)', () => {
     const { content } = compile(`
     <script setup>
@@ -380,6 +395,19 @@ defineExpose({ foo: 123 })
         </template>
         `)
       expect(content).toMatch(`return { cond, bar, baz }`)
+      assertCode(content)
+    })
+
+    test('imported ref as template ref', () => {
+      const { content } = compile(`
+        <script setup lang="ts">
+        import { aref } from './x'
+        </script>
+        <template>
+          <div ref="aref"></div>
+        </template>
+        `)
+      expect(content).toMatch(`return { aref }`)
       assertCode(content)
     })
 
@@ -1081,6 +1109,19 @@ const emit = defineEmits(['a', 'b'])
       expect(content).toMatch(`emits: ["foo", "bar"]`)
     })
 
+    // https://github.com/vuejs/core/issues/5393
+    test('defineEmits w/ type (interface ts type)', () => {
+      const { content } = compile(`
+      <script setup lang="ts">
+      interface Emits { (e: 'foo'): void }
+      const emit: Emits = defineEmits(['foo'])
+      </script>
+      `)
+      assertCode(content)
+      expect(content).toMatch(`setup(__props, { emit }) {`)
+      expect(content).toMatch(`emits: ['foo']`)
+    })
+
     test('runtime Enum', () => {
       const { content, bindings } = compile(
         `<script setup lang="ts">
@@ -1571,7 +1612,23 @@ describe('SFC analyze <script> bindings', () => {
       </script>
       <template>
         <div @click="$emit('update:a');"></div>
-      </tempalte>
+      </template>
+      `)
+    })
+
+    // #12841
+    test('should not error when performing ts expression check for v-slot destructured default value', () => {
+      compile(`
+      <script setup lang="ts">
+        import FooComp from './Foo.vue'
+      </script>
+      <template>
+        <FooComp>
+          <template #bar="{ bar = { baz: '' } }">
+            {{ bar.baz }}
+          </template>
+        </FooComp>
+      </template>
       `)
     })
   })

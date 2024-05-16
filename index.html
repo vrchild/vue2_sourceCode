@@ -1,20 +1,36 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang='en'>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Document</title>
+  <meta charset='UTF-8'>
+  <title>源码调试</title>
+  <!-- 根据index.html路径引入 -->
   <script src="./dist/vue.js"></script>
 </head>
 <body>
   <div id="app">
     <span>who are you ???</span>
     {{ message }}
+    <keep-alive>
+      <test/>
+    </keep-alive>
   </div>
 
   <script>
+    Vue.component('test', {
+      data: function () {
+        return {
+        }
+      },
+      template: '<p>i am test</p>'
+    })
+    Vue.component('children', {
+      data: function () {
+        return {
+        }
+      },
+      template: '<p>i am children</p>'
+    })
+
     var app = new Vue({
       el: '#app',
       data() {
@@ -29,3 +45,9 @@
   </script>
 </body>
 </html>
+<script>
+  import KeepAlive from './src/core/components/keep-alive'
+  export default {
+    components: { KeepAlive }
+  }
+</script>

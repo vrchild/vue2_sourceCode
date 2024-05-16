@@ -42,7 +42,7 @@ export const bindRE = /^:|^\.|^v-bind:/
 const propBindRE = /^\./
 const modifierRE = /\.[^.\]]+(?=[^\]]*$)/g
 
-const slotRE = /^v-slot(:|$)|^#/
+export const slotRE = /^v-slot(:|$)|^#/
 
 const lineBreakRE = /[\r\n]/
 const whitespaceRE = /[ \f\t\r\n]+/g
@@ -182,15 +182,18 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
   }
 
   function trimEndingWhitespace(el) {
+    console.log('去除空节点', el, inPre)
     // remove trailing whitespace node
     if (!inPre) {
       let lastNode
+      // console.log('111111', el.children, [el.children.length - 1])
       while (
         (lastNode = el.children[el.children.length - 1]) &&
         lastNode.type === 3 &&
         lastNode.text === ' '
       ) {
-        el.children.pop()
+        console.log('满足去除空节点', lastNode, el.children.pop())
+        // el.children.pop()
       }
     }
   }
@@ -401,11 +404,7 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
         }
       }
     },
-    // 保存的注释<!-- --> 的AST数据结构
     comment(text: string, start, end) {
-      //text: <!-- 注释的内容 -->
-      //start: // 注释第一个index
-      //end: // 注释最后一个index
       // adding anything as a sibling to the root node is forbidden
       // comments should still be allowed, but ignored
       if (currentParent) {
@@ -422,10 +421,9 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
       }
     }
   })
-  // console.log('root', root)
   return root
 }
-
+// v-pre指令的处理
 function processPre(el) {
   if (getAndRemoveAttr(el, 'v-pre') != null) {
     el.pre = true
@@ -651,7 +649,9 @@ function processSlotContent(el) {
 
   // slot="xxx"
   const slotTarget = getBindingAttr(el, 'slot')
+  console.log('slot="xxx"', slotTarget)
   if (slotTarget) {
+    console.log('slot="xxx"')
     el.slotTarget = slotTarget === '""' ? '"default"' : slotTarget
     el.slotTargetDynamic = !!(
       el.attrsMap[':slot'] || el.attrsMap['v-bind:slot']
@@ -665,6 +665,7 @@ function processSlotContent(el) {
 
   // 2.6 v-slot syntax
   if (process.env.NEW_SLOT_SYNTAX) {
+    console.log('v-slot syntax')
     if (el.tag === 'template') {
       // v-slot on <template>
       const slotBinding = getAndRemoveAttrByRegex(el, slotRE)
