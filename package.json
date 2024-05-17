@@ -1,7 +1,7 @@
 {
   "name": "vue",
   "version": "2.7.16",
-  "packageManager": "pnpm@8.9.2",
+  "packageManager": "pnpm@9.0.6",
   "description": "Reactive, component-oriented view layer for modern web interfaces.",
   "main": "dist/vue.runtime.common.js",
   "module": "dist/vue.runtime.esm.js",
